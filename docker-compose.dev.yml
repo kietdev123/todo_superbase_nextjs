@@ -1,0 +1,27 @@
+services:
+  web_admin:
+    build:
+      context: ./web_admin
+      target: development
+      args:
+        NODE_VERSION: 24.20.0
+        ALPINE_VERSION: "3.23"
+    command: npm run dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./web_admin:/app
+      - web_admin_node_modules:/app/node_modules
+      - web_admin_next:/app/.next
+    restart: unless-stopped
+
+volumes:
+  web_admin_node_modules:
+  web_admin_next:
+
