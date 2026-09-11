@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/common/empty-state";
 import { Loading } from "@/components/common/loading";
 import { PageHeader } from "@/components/common/page-header";
 import { StatusBadge } from "@/components/common/status-badge";
+import { TablePagination } from "@/components/common/table-pagination";
 import { useAppSettings } from "@/components/providers/app-settings-provider";
 import {
   AlertDialog,
@@ -51,6 +52,11 @@ type SendNotificationResponse = {
   error?: string;
 };
 
+type PaginatedUsersResponse = {
+  items: ManagedUser[];
+  total_count: number;
+};
+
 async function getFunctionErrorMessage(error: unknown): Promise<string> {
   const functionError = error as { message?: unknown; context?: unknown };
 
@@ -85,31 +91,45 @@ export function UserManagement() {
   const [notificationBody, setNotificationBody] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalUsers, setTotalUsers] = useState(0);
 
   useEffect(() => {
     let active = true;
 
     async function loadUsers() {
       const supabase = createClient();
-      const { data, error: loadError } = await supabase.rpc("admin_list_users");
+      const { data, error: loadError } = await supabase.rpc(
+        "admin_list_users_paginated",
+        {
+          result_offset: (page - 1) * pageSize,
+          result_limit: pageSize,
+        },
+      );
 
       if (!active) return;
 
       if (loadError) {
         setError(loadError.message);
       } else {
-        const loadedUsers = (data ?? []) as ManagedUser[];
+        setError("");
+        const result = data as unknown as PaginatedUsersResponse | null;
+        const loadedUsers = result?.items ?? [];
         setUsers(loadedUsers);
-        setDraftRoles(
-          Object.fromEntries(
+        setTotalUsers(Number(result?.total_count ?? 0));
+        setDraftRoles((current) => ({
+          ...current,
+          ...Object.fromEntries(
             loadedUsers.map((user) => [user.user_id, user.role]),
           ),
-        );
-        setDraftFcmTokens(
-          Object.fromEntries(
+        }));
+        setDraftFcmTokens((current) => ({
+          ...current,
+          ...Object.fromEntries(
             loadedUsers.map((user) => [user.user_id, user.fcm_token ?? ""]),
           ),
-        );
+        }));
       }
       setLoading(false);
     }
@@ -119,7 +139,7 @@ export function UserManagement() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [page, pageSize]);
 
   function isPending(userId: string, action: PendingAction) {
     return pending?.userId === userId && pending.action === action;
@@ -410,6 +430,9 @@ export function UserManagement() {
     },
   ];
 
+  const pageCount = Math.max(1, Math.ceil(totalUsers / pageSize));
+  const safePage = Math.min(page, pageCount);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -437,6 +460,7 @@ export function UserManagement() {
         <Card>
           <CardContent className="p-0">
             <DataTable
+              className="rounded-none border-0"
               columns={columns}
               data={users}
               emptyState={
@@ -448,6 +472,22 @@ export function UserManagement() {
               }
               getRowId={(user) => user.user_id}
             />
+            {totalUsers > 0 ? (
+              <TablePagination
+                onPageChange={(nextPage) => {
+                  setLoading(true);
+                  setPage(nextPage);
+                }}
+                onPageSizeChange={(nextPageSize) => {
+                  setLoading(true);
+                  setPageSize(nextPageSize);
+                  setPage(1);
+                }}
+                page={safePage}
+                pageSize={pageSize}
+                totalItems={totalUsers}
+              />
+            ) : null}
           </CardContent>
         </Card>
       )}

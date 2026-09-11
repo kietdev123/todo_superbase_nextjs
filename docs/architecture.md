@@ -29,7 +29,7 @@ Các permission hiện có:
 - `users.update_fcm_token`, `notifications.send`.
 - `roles.read`, `roles.update_permission`.
 
-`admin_list_users` và `admin_update_user_role` là RPC quản lý user. `admin_list_role_permissions` và `admin_set_role_permission` là RPC quản lý ánh xạ role-permission. Các hàm chạy `security definer` để truy cập dữ liệu cần thiết, nhưng luôn gọi `authorize(...)` trước và chỉ cấp quyền thực thi cho role Postgres `authenticated`.
+`admin_list_users_paginated` lấy đúng một trang user và tổng số bản ghi; `admin_update_user_role` cập nhật role. Todo dùng PostgREST `range()` cùng `count: exact`, vì vậy hai màn hình danh sách đều không tải toàn bộ dữ liệu về browser. `admin_list_role_permissions` và `admin_set_role_permission` là RPC quản lý ánh xạ role-permission. Các hàm chạy `security definer` để truy cập dữ liệu cần thiết, nhưng luôn gọi `authorize(...)` trước và chỉ cấp quyền thực thi cho role Postgres `authenticated`.
 
 Permission của `super_admin` không thể bị tắt qua RPC. RPC đổi role cũng ngăn hạ role của super admin cuối cùng để tránh khóa toàn bộ quyền quản trị.
 

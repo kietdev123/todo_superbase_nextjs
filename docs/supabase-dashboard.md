@@ -7,9 +7,10 @@ Repo chỉ lưu mã nguồn Supabase. Dev tự áp dụng thay đổi lên proje
 1. Mở **SQL Editor > New query**.
 2. Dán và chạy `superbase/migrations/init.sql`.
 3. Dán và chạy `superbase/migrations/202609110001_add_fcm_notifications.sql`.
-4. Vào **Authentication > Hooks > Custom Access Token Hook**.
-5. Bật hook và chọn `public.custom_access_token_hook`.
-6. Kiểm tra bảng và policy trong **Table Editor**.
+4. Dán và chạy `superbase/migrations/202609110002_add_paginated_user_list.sql`.
+5. Vào **Authentication > Hooks > Custom Access Token Hook**.
+6. Bật hook và chọn `public.custom_access_token_hook`.
+7. Kiểm tra bảng và policy trong **Table Editor**.
 
 `init.sql` chỉ tạo object database. Nếu object đã tồn tại và cần tạo lại trong development, làm đúng quy trình tại [Reset dữ liệu development](reset-development-data.md).
 
@@ -27,9 +28,9 @@ File seed không tạo tài khoản hoặc mật khẩu; file chỉ cập nhật
 
 Sau khi đăng nhập bằng super admin:
 
-- Mở `/admin/users` để xem user và đổi role giữa `super_admin`, `admin`, `user`.
-- Tại `/admin/users`, lưu FCM token và gửi thông báo tới từng user.
-- Mở `/admin/roles` để bật/tắt permission đã định nghĩa sẵn.
+- Mở `/users` để xem user và đổi role giữa `super_admin`, `admin`, `user`.
+- Tại `/users`, lưu FCM token và gửi thông báo tới từng user.
+- Mở `/roles` để bật/tắt permission đã định nghĩa sẵn.
 
 Sau khi đổi role, tài khoản bị thay đổi phải đăng nhập lại. Không cấp quyền trực tiếp cho `authenticated`/`anon` trên `user_roles`, `role_permissions` hoặc `auth.users`.
 

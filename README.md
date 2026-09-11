@@ -14,8 +14,10 @@ Repo mẫu cho web admin dùng **Next.js App Router + TypeScript + Tailwind CSS 
 │       ├── reset.sql              # Xóa schema và dữ liệu ứng dụng
 │       ├── init.sql               # Tạo schema, RBAC, RLS và RPC
 │       ├── seed_data.sql          # Gán role super_admin cho tài khoản đã có
-│       └── 202609110001_add_fcm_notifications.sql
-│                                  # Migration bổ sung FCM, không reset dữ liệu
+│       ├── 202609110001_add_fcm_notifications.sql
+│       │                           # Migration bổ sung FCM, không reset dữ liệu
+│       └── 202609110002_add_paginated_user_list.sql
+│                                  # RPC lấy danh sách user theo trang
 ├── web_admin/
 │   ├── src/
 │   │   ├── app/
@@ -57,6 +59,7 @@ Admin shell gồm **Sidebar + Header + Content**:
 - Lựa chọn ngôn ngữ và trạng thái thu gọn sidebar được lưu trong `localStorage`; theme do `next-themes` quản lý.
 - Menu được khai báo tập trung tại `web_admin/src/config/navigation.ts`; tên ứng dụng và version nằm tại `web_admin/src/config/app.ts`; nội dung song ngữ nằm tại `web_admin/src/config/i18n.ts`.
 - Các component dùng lại gồm `PageHeader`, `DataTable`, `Loading`, `EmptyState`, `ConfirmDialog` và `StatusBadge`.
+- Màn hình todo hiển thị dữ liệu bằng table. Cả todo và user đều phân trang từ Supabase với tùy chọn 10, 20 hoặc 50 dòng mỗi trang: todo dùng PostgREST `range()` kèm `count: exact`, user dùng RPC `admin_list_users_paginated` trả về dữ liệu trang hiện tại và `total_count`.
 
 Các route chính:
 
@@ -90,12 +93,13 @@ Browser không được đọc trực tiếp bảng `auth.users` và không gi�
 1. Tạo project Supabase.
 2. Mở **SQL Editor**, chạy toàn bộ file `superbase/migrations/init.sql`.
 3. Chạy migration `superbase/migrations/202609110001_add_fcm_notifications.sql`.
-4. Vào **Authentication > Hooks > Custom Access Token Hook**, bật hook và chọn `public.custom_access_token_hook`.
-5. Vào **Authentication > Users > Add user**, tự tạo tài khoản super admin bằng email và mật khẩu.
-6. Mở `superbase/migrations/seed_data.sql`, thay `super_admin@example.com` bằng đúng email vừa tạo rồi chạy file trong SQL Editor.
-7. Đăng xuất và đăng nhập lại để JWT chứa claim `user_role = super_admin`.
-8. Thiết lập Firebase key và deploy `send-fcm-notification` theo [hướng dẫn FCM](docs/fcm-notifications.md).
-9. Nếu ứng dụng không cho tự đăng ký, tắt đăng ký công khai trong Email Provider.
+4. Chạy migration `superbase/migrations/202609110002_add_paginated_user_list.sql`.
+5. Vào **Authentication > Hooks > Custom Access Token Hook**, bật hook và chọn `public.custom_access_token_hook`.
+6. Vào **Authentication > Users > Add user**, tự tạo tài khoản super admin bằng email và mật khẩu.
+7. Mở `superbase/migrations/seed_data.sql`, thay `super_admin@example.com` bằng đúng email vừa tạo rồi chạy file trong SQL Editor.
+8. Đăng xuất và đăng nhập lại để JWT chứa claim `user_role = super_admin`.
+9. Thiết lập Firebase key và deploy `send-fcm-notification` theo [hướng dẫn FCM](docs/fcm-notifications.md).
+10. Nếu ứng dụng không cho tự đăng ký, tắt đăng ký công khai trong Email Provider.
 
 `seed_data.sql` không tạo tài khoản Auth, mật khẩu hay permission. File chỉ cập nhật tài khoản theo email thành role `super_admin`. Permission nền được cấu hình trong `init.sql`; permission FCM được thêm bởi migration mới.
 
@@ -119,7 +123,7 @@ Firebase service-account JSON phải được lưu trong Supabase Edge Function 
 
 ## Cấp và thu hồi quyền
 
-Cách thông thường là đăng nhập bằng `super_admin`, mở `/admin/users`, chọn role mới rồi bấm **Lưu**. User vừa bị đổi role phải đăng xuất và đăng nhập lại vì JWT hiện tại chưa tự nhận claim mới.
+Cách thông thường là đăng nhập bằng `super_admin`, mở `/users`, chọn role mới rồi bấm **Lưu**. User vừa bị đổi role phải đăng xuất và đăng nhập lại vì JWT hiện tại chưa tự nhận claim mới.
 
 Có thể thao tác thủ công trong SQL Editor khi cần khôi phục quyền.
 
@@ -170,6 +174,7 @@ Các file SQL có trách nhiệm tách biệt:
 - `init.sql`: chỉ tạo schema, enum, bảng, function, trigger, policy và grant.
 - `seed_data.sql`: chỉ gán role `super_admin` cho tài khoản Auth đã có.
 - `202609110001_add_fcm_notifications.sql`: thêm schema, permission và RPC FCM lên database hiện có.
+- `202609110002_add_paginated_user_list.sql`: thêm RPC lấy user theo trang, không reset dữ liệu.
 
 Thứ tự reset đầy đủ:
 
@@ -178,9 +183,10 @@ Thứ tự reset đầy đủ:
 3. Chạy `reset.sql`.
 4. Chạy `init.sql`.
 5. Chạy `202609110001_add_fcm_notifications.sql`.
-6. Sửa email trong `seed_data.sql`, bảo đảm tài khoản đó đã tồn tại, rồi chạy file.
-7. Bật lại Custom Access Token Hook với `public.custom_access_token_hook`.
-8. Đăng xuất và đăng nhập lại.
+6. Chạy `202609110002_add_paginated_user_list.sql`.
+7. Sửa email trong `seed_data.sql`, bảo đảm tài khoản đó đã tồn tại, rồi chạy file.
+8. Bật lại Custom Access Token Hook với `public.custom_access_token_hook`.
+9. Đăng xuất và đăng nhập lại.
 
 Xem thêm [Hướng dẫn reset dữ liệu development](docs/reset-development-data.md).
 
