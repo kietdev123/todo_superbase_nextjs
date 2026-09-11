@@ -7,11 +7,15 @@ Repo mẫu cho trang quản trị todo. Next.js kết nối trực tiếp tới 
 ```text
 .
 ├── superbase/
-│   ├── functions/todos-summary/   # Mã nguồn Edge Function
+│   ├── functions/
+│   │   ├── todos-summary/         # Edge Function thống kê todo
+│   │   └── send-fcm-notification/ # Edge Function gửi FCM
 │   └── migrations/
 │       ├── reset.sql              # Xóa schema và dữ liệu ứng dụng
 │       ├── init.sql               # Tạo schema, RBAC, RLS và RPC
-│       └── seed_data.sql          # Gán role super_admin cho tài khoản đã có
+│       ├── seed_data.sql          # Gán role super_admin cho tài khoản đã có
+│       └── 202609110001_add_fcm_notifications.sql
+│                                  # Migration bổ sung FCM, không reset dữ liệu
 ├── web_admin/                     # Next.js client và API health check
 ├── docs/                          # Tài liệu kiến trúc và Dashboard
 ├── docker-compose.dev.yml         # Dev có Fast Refresh
@@ -29,31 +33,47 @@ Repo áp dụng mô hình [Custom Claims và RBAC của Supabase](https://supaba
 | --- | --- |
 | `user` | Chỉ đọc, tạo, sửa và xóa todo của chính mình |
 | `admin` | Thao tác toàn bộ todo |
-| `super_admin` | Có mọi permission, thêm màn hình quản lý user và role |
+| `super_admin` | Có mọi permission, quản lý user/role/FCM và gửi thông báo |
 
 `user_roles` lưu role của user, `role_permissions` ánh xạ role với permission, Custom Access Token Hook đưa `user_role` vào JWT và RLS gọi `authorize(permission)` để kiểm tra quyền.
 
-Browser không được đọc trực tiếp bảng `auth.users` và không giữ `service_role` key. Hai màn hình quản trị gọi trực tiếp Postgres RPC bằng access token của user; từng RPC tự kiểm tra permission trước khi xử lý.
+Browser không được đọc trực tiếp bảng `auth.users` và không giữ `service_role` hoặc Firebase private key. Hai màn hình quản trị gọi Postgres RPC bằng access token của user; thao tác gửi FCM gọi Edge Function đã được bảo vệ bằng JWT và RBAC.
 
 ## Khởi tạo Supabase
 
 1. Tạo project Supabase.
 2. Mở **SQL Editor**, chạy toàn bộ file `superbase/migrations/init.sql`.
-3. Vào **Authentication > Hooks > Custom Access Token Hook**, bật hook và chọn `public.custom_access_token_hook`.
-4. Vào **Authentication > Users > Add user**, tự tạo tài khoản super admin bằng email và mật khẩu.
-5. Mở `superbase/migrations/seed_data.sql`, thay `super_admin@example.com` bằng đúng email vừa tạo rồi chạy file trong SQL Editor.
-6. Đăng xuất và đăng nhập lại để JWT chứa claim `user_role = super_admin`.
-7. Nếu ứng dụng không cho tự đăng ký, tắt đăng ký công khai trong Email Provider.
+3. Chạy migration `superbase/migrations/202609110001_add_fcm_notifications.sql`.
+4. Vào **Authentication > Hooks > Custom Access Token Hook**, bật hook và chọn `public.custom_access_token_hook`.
+5. Vào **Authentication > Users > Add user**, tự tạo tài khoản super admin bằng email và mật khẩu.
+6. Mở `superbase/migrations/seed_data.sql`, thay `super_admin@example.com` bằng đúng email vừa tạo rồi chạy file trong SQL Editor.
+7. Đăng xuất và đăng nhập lại để JWT chứa claim `user_role = super_admin`.
+8. Thiết lập Firebase key và deploy `send-fcm-notification` theo [hướng dẫn FCM](docs/fcm-notifications.md).
+9. Nếu ứng dụng không cho tự đăng ký, tắt đăng ký công khai trong Email Provider.
 
-`seed_data.sql` không tạo tài khoản Auth, mật khẩu hay permission. File chỉ cập nhật tài khoản theo email thành role `super_admin`. Permission mặc định đã được cấu hình trong `init.sql`.
+`seed_data.sql` không tạo tài khoản Auth, mật khẩu hay permission. File chỉ cập nhật tài khoản theo email thành role `super_admin`. Permission nền được cấu hình trong `init.sql`; permission FCM được thêm bởi migration mới.
 
 Sau khi đăng nhập:
 
 - `/admin`: quản lý todo.
-- `/admin/users`: super admin xem danh sách user và cập nhật role.
+- `/admin/users`: super admin cập nhật role, FCM token và gửi thông báo.
 - `/admin/roles`: super admin bật/tắt permission có sẵn của từng role.
 
 Không có UI tạo, sửa hoặc xóa định nghĩa permission. Permission của `super_admin` luôn bật; hệ thống cũng không cho hạ role của super admin cuối cùng.
+
+## Thông báo FCM
+
+Mỗi user có tối đa một FCM registration token trong `user_notification_settings`. Super admin lưu token tại `/admin/users`, sau đó bấm **Gửi thông báo** và nhập tiêu đề/nội dung.
+
+Edge Function `send-fcm-notification`:
+
+- xác thực Supabase JWT của người gọi;
+- kiểm tra permission `notifications.send`;
+- lấy token qua RPC, không cho browser đọc bảng token trực tiếp;
+- tạo OAuth access token ngắn hạn từ Firebase service account;
+- gửi message bằng FCM HTTP v1.
+
+Firebase service-account JSON phải được lưu trong Supabase Edge Function Secrets với tên `FIREBASE_SERVICE_ACCOUNT_JSON`. Không thêm key này vào `.env`, source code hoặc Docker của `web_admin`. Xem [Thiết lập gửi thông báo FCM](docs/fcm-notifications.md).
 
 ## Cấp và thu hồi quyền
 
@@ -102,11 +122,12 @@ Không chỉnh role trong `auth.users.raw_app_meta_data`. Sau mọi thay đổi 
 
 ## Reset môi trường development
 
-Ba file SQL có trách nhiệm tách biệt:
+Các file SQL có trách nhiệm tách biệt:
 
-- `reset.sql`: chỉ xóa object và dữ liệu ứng dụng, giữ tài khoản trong `auth.users`.
+- `reset.sql`: reset schema nền và giữ tài khoản trong `auth.users`; file không chứa thay đổi FCM.
 - `init.sql`: chỉ tạo schema, enum, bảng, function, trigger, policy và grant.
 - `seed_data.sql`: chỉ gán role `super_admin` cho tài khoản Auth đã có.
+- `202609110001_add_fcm_notifications.sql`: thêm schema, permission và RPC FCM lên database hiện có.
 
 Thứ tự reset đầy đủ:
 
@@ -114,9 +135,10 @@ Thứ tự reset đầy đủ:
 2. Tắt Custom Access Token Hook.
 3. Chạy `reset.sql`.
 4. Chạy `init.sql`.
-5. Sửa email trong `seed_data.sql`, bảo đảm tài khoản đó đã tồn tại, rồi chạy file.
-6. Bật lại Custom Access Token Hook với `public.custom_access_token_hook`.
-7. Đăng xuất và đăng nhập lại.
+5. Chạy `202609110001_add_fcm_notifications.sql`.
+6. Sửa email trong `seed_data.sql`, bảo đảm tài khoản đó đã tồn tại, rồi chạy file.
+7. Bật lại Custom Access Token Hook với `public.custom_access_token_hook`.
+8. Đăng xuất và đăng nhập lại.
 
 Xem thêm [Hướng dẫn reset dữ liệu development](docs/reset-development-data.md).
 
@@ -193,8 +215,13 @@ Repo không cấu hình test theo phạm vi hiện tại.
 
 Không có API Next.js trung gian cho đăng nhập, todo, user hoặc role. Browser gọi Supabase trực tiếp và database áp dụng RLS/RBAC.
 
+Edge Function có thêm:
+
+- `POST /functions/v1/send-fcm-notification`: gửi FCM tới token của một user; yêu cầu JWT và permission `notifications.send`.
+
 ## Tài liệu thêm
 
 - [Kiến trúc và luồng xác thực](docs/architecture.md)
 - [Thao tác trên Supabase Dashboard](docs/supabase-dashboard.md)
+- [Thiết lập gửi thông báo FCM](docs/fcm-notifications.md)
 - [Reset dữ liệu development](docs/reset-development-data.md)

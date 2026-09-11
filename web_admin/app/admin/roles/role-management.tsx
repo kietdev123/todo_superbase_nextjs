@@ -11,8 +11,10 @@ type AppPermission =
   | "todos.delete_all"
   | "users.read"
   | "users.update_role"
+  | "users.update_fcm_token"
   | "roles.read"
-  | "roles.update_permission";
+  | "roles.update_permission"
+  | "notifications.send";
 
 type RolePermission = {
   role: AppRole;
@@ -28,8 +30,10 @@ const permissionLabels: Record<AppPermission, string> = {
   "todos.delete_all": "Xóa todo của mọi user",
   "users.read": "Xem danh sách user",
   "users.update_role": "Cập nhật role của user",
+  "users.update_fcm_token": "Cập nhật FCM token của user",
   "roles.read": "Xem permission của role",
   "roles.update_permission": "Cập nhật permission của role",
+  "notifications.send": "Gửi thông báo FCM",
 };
 
 export function RoleManagement() {

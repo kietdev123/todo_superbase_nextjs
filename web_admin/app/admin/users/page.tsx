@@ -21,8 +21,8 @@ export default async function UsersPage() {
           <p className="eyebrow">Super Admin</p>
           <h1>Quản lý user</h1>
           <p className="subtitle">
-            Xem tài khoản và cập nhật role. User phải đăng nhập lại sau khi đổi
-            role để nhận claim mới.
+            Cập nhật role, lưu FCM token và gửi thông báo tới thiết bị của user.
+            User phải đăng nhập lại sau khi đổi role để nhận claim mới.
           </p>
         </div>
       </header>

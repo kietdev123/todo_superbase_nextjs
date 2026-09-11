@@ -30,7 +30,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -95,8 +96,10 @@ h1 {
 }
 
 .field input,
+.field textarea,
 .todo-form input,
-.management-table select {
+.management-table select,
+.notification-controls input {
   width: 100%;
   min-width: 0;
   padding: 12px 14px;
@@ -108,8 +111,10 @@ h1 {
 }
 
 .field input:focus,
+.field textarea:focus,
 .todo-form input:focus,
-.management-table select:focus {
+.management-table select:focus,
+.notification-controls input:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(22, 121, 75, 0.12);
 }
@@ -161,7 +166,7 @@ h1 {
 }
 
 .admin-shell {
-  width: min(100% - 40px, 920px);
+  width: min(100% - 40px, 1240px);
   margin: 0 auto;
   padding: 48px 0;
 }
@@ -328,6 +333,27 @@ h1 {
   min-width: 130px;
 }
 
+.user-management-table td:last-child {
+  min-width: 410px;
+}
+
+.table-control-group,
+.notification-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.notification-controls input {
+  min-width: 360px;
+}
+
+.table-actions,
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .table-primary,
 .management-table small {
   display: block;
@@ -342,6 +368,42 @@ h1 {
 .button-compact {
   min-height: 38px;
   padding: 7px 12px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(13, 27, 20, 0.5);
+}
+
+.modal-card {
+  width: min(100%, 520px);
+  padding: 26px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.modal-card h2 {
+  margin-bottom: 8px;
+}
+
+.modal-card .subtitle {
+  margin-bottom: 22px;
+  overflow-wrap: anywhere;
+}
+
+.modal-card textarea {
+  resize: vertical;
+}
+
+.modal-actions {
+  margin-top: 4px;
 }
 
 .role-grid {
