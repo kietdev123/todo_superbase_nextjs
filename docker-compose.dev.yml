@@ -1,5 +1,6 @@
 services:
   web_admin:
+    image: todo-web-admin:dev
     build:
       context: ./web_admin
       target: development
@@ -8,7 +9,7 @@ services:
         ALPINE_VERSION: "3.23"
     command: npm run dev
     ports:
-      - "3000:3000"
+      - "${WEB_ADMIN_PORT:-3000}:3000"
     env_file:
       - .env
     environment:
@@ -24,4 +25,3 @@ services:
 volumes:
   web_admin_node_modules:
   web_admin_next:
-

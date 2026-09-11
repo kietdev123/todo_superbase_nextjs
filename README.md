@@ -1,6 +1,6 @@
 # Todo Admin với Supabase và Next.js
 
-Repo mẫu cho trang quản trị todo. Next.js kết nối trực tiếp tới Supabase để đăng nhập, thao tác todo và gọi các Postgres RPC quản trị. API Next.js duy nhất là health check.
+Repo mẫu cho web admin dùng **Next.js App Router + TypeScript + Tailwind CSS + shadcn/ui + Lucide**. Browser kết nối trực tiếp Supabase để đăng nhập, thao tác dữ liệu theo RLS/RBAC, gọi Postgres RPC quản trị và Edge Function gửi FCM. Next.js không làm lớp API trung gian; API nội bộ duy nhất là health check.
 
 ## Cấu trúc thư mục
 
@@ -16,7 +16,30 @@ Repo mẫu cho trang quản trị todo. Next.js kết nối trực tiếp tới 
 │       ├── seed_data.sql          # Gán role super_admin cho tài khoản đã có
 │       └── 202609110001_add_fcm_notifications.sql
 │                                  # Migration bổ sung FCM, không reset dữ liệu
-├── web_admin/                     # Next.js client và API health check
+├── web_admin/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── (auth)/login/     # Trang đăng nhập Supabase Auth
+│   │   │   ├── (admin)/          # Layout và các route được bảo vệ
+│   │   │   │   ├── dashboard/
+│   │   │   │   ├── todos/
+│   │   │   │   ├── users/
+│   │   │   │   └── roles/
+│   │   │   └── health/           # GET /health
+│   │   ├── components/
+│   │   │   ├── layout/           # Sidebar, Header, UserMenu, AdminShell
+│   │   │   ├── common/           # Component dùng lại giữa các màn hình
+│   │   │   └── ui/               # Primitive theo chuẩn shadcn/ui
+│   │   ├── config/               # App, menu và nội dung Anh/Việt
+│   │   ├── constants/
+│   │   ├── hooks/
+│   │   ├── lib/
+│   │   │   ├── api/health.ts
+│   │   │   └── supabase/         # Browser client và server client tách riêng
+│   │   └── types/
+│   ├── components.json           # Cấu hình shadcn/ui
+│   ├── Dockerfile
+│   └── package.json              # Version hiển thị trên sidebar/dashboard
 ├── docs/                          # Tài liệu kiến trúc và Dashboard
 ├── docker-compose.dev.yml         # Dev có Fast Refresh
 ├── docker-compose.prod.yml        # Production dùng image bất biến
@@ -24,6 +47,29 @@ Repo mẫu cho trang quản trị todo. Next.js kết nối trực tiếp tới 
 ```
 
 Tên thư mục `superbase` được giữ theo quy ước của repo. Dịch vụ và SDK bên trong vẫn là Supabase.
+
+## Web admin
+
+Admin shell gồm **Sidebar + Header + Content**:
+
+- Sidebar hiển thị logo/tên hệ thống, menu đang active, hỗ trợ thu gọn trên desktop và hiển thị version lấy trực tiếp từ `web_admin/package.json`.
+- Header hiển thị tài khoản đang đăng nhập. Bấm vào tài khoản để xem tên/email, đổi ngôn ngữ **Tiếng Việt/English**, chọn theme **Sáng/Tối/Theo hệ thống** hoặc đăng xuất.
+- Lựa chọn ngôn ngữ và trạng thái thu gọn sidebar được lưu trong `localStorage`; theme do `next-themes` quản lý.
+- Menu được khai báo tập trung tại `web_admin/src/config/navigation.ts`; tên ứng dụng và version nằm tại `web_admin/src/config/app.ts`; nội dung song ngữ nằm tại `web_admin/src/config/i18n.ts`.
+- Các component dùng lại gồm `PageHeader`, `DataTable`, `Loading`, `EmptyState`, `ConfirmDialog` và `StatusBadge`.
+
+Các route chính:
+
+| Route | Quyền | Chức năng |
+| --- | --- | --- |
+| `/login` | Công khai | Đăng nhập bằng Supabase Auth |
+| `/dashboard` | Đã đăng nhập | Trạng thái Supabase, health API và version |
+| `/todos` | Đã đăng nhập | Quản lý todo theo RLS/RBAC |
+| `/users` | `super_admin` | Cập nhật role, FCM token và gửi thông báo |
+| `/roles` | `super_admin` | Bật/tắt permission đã định nghĩa sẵn |
+| `/health` | Công khai | Health check của web admin |
+
+Các URL cũ `/admin`, `/admin/users`, `/admin/roles` vẫn được redirect tương ứng để không làm hỏng bookmark.
 
 ## Mô hình phân quyền
 
@@ -53,17 +99,13 @@ Browser không được đọc trực tiếp bảng `auth.users` và không gi�
 
 `seed_data.sql` không tạo tài khoản Auth, mật khẩu hay permission. File chỉ cập nhật tài khoản theo email thành role `super_admin`. Permission nền được cấu hình trong `init.sql`; permission FCM được thêm bởi migration mới.
 
-Sau khi đăng nhập:
-
-- `/admin`: quản lý todo.
-- `/admin/users`: super admin cập nhật role, FCM token và gửi thông báo.
-- `/admin/roles`: super admin bật/tắt permission có sẵn của từng role.
+Sau khi đăng nhập, user được chuyển tới `/dashboard`. `user` và `admin` có màn hình tổng quan/todo; riêng `super_admin` nhìn thấy thêm menu `/users` và `/roles`.
 
 Không có UI tạo, sửa hoặc xóa định nghĩa permission. Permission của `super_admin` luôn bật; hệ thống cũng không cho hạ role của super admin cuối cùng.
 
 ## Thông báo FCM
 
-Mỗi user có tối đa một FCM registration token trong `user_notification_settings`. Super admin lưu token tại `/admin/users`, sau đó bấm **Gửi thông báo** và nhập tiêu đề/nội dung.
+Mỗi user có tối đa một FCM registration token trong `user_notification_settings`. Super admin lưu token tại `/users`, sau đó bấm **Gửi thông báo** và nhập tiêu đề/nội dung.
 
 Edge Function `send-fcm-notification`:
 
@@ -165,6 +207,14 @@ docker compose -f docker-compose.dev.yml up --build
 
 Mở <http://localhost:3000>. Source được mount vào container và Next.js Fast Refresh tự cập nhật khi code thay đổi. Nếu đổi `package.json` hoặc `package-lock.json`, chạy lại lệnh có `--build`.
 
+Nếu cổng 3000 đang được ứng dụng khác sử dụng, chọn cổng khác mà không cần sửa compose:
+
+```bash
+WEB_ADMIN_PORT=3100 docker compose -f docker-compose.dev.yml up --build
+```
+
+Khi đó mở <http://localhost:3100>. Có thể lưu `WEB_ADMIN_PORT=3100` trong `.env` để áp dụng cho cả dev và production.
+
 Dừng dev:
 
 ```bash
@@ -185,11 +235,13 @@ docker compose -f docker-compose.prod.yml up --build -d
 
 Production không mount source nên không tự cập nhật khi code đổi. Khi phát hành code hoặc đổi cấu hình Supabase, chạy lại lệnh trên để build image và tạo lại service.
 
-Health check: <http://localhost:3000/api/health>.
+Health check: <http://localhost:3000/health>.
 
 ## Chạy không dùng Docker
 
 Yêu cầu đúng Node.js `24.20.0` và npm `11.19.0`.
+
+Toàn bộ dependency trong `web_admin/package.json` được khóa bằng phiên bản cụ thể, không dùng `latest`, `^` hoặc `~`. Dùng `npm ci` để cài đúng `package-lock.json`.
 
 ```bash
 cd web_admin
@@ -211,7 +263,7 @@ Repo không cấu hình test theo phạm vi hiện tại.
 
 ## API
 
-- `GET /api/health`: health check công khai.
+- `GET /health`: health check công khai, được dashboard gọi qua module `web_admin/src/lib/api/health.ts`.
 
 Không có API Next.js trung gian cho đăng nhập, todo, user hoặc role. Browser gọi Supabase trực tiếp và database áp dụng RLS/RBAC.
 
